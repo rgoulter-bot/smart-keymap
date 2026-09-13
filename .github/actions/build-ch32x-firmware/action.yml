@@ -107,6 +107,9 @@ runs:
         else
           FIRMWARE_DIR="$FIRMWARE_DIR_INPUT"
         fi
+        # Normalize to absolute for downstream steps (handles caller/ smart-keymap/ prefix correctly)
+        FIRMWARE_DIR="$(realpath -m "$FIRMWARE_DIR")"
+        SMART_KEYMAP_DIR="$(realpath -m "$SMART_KEYMAP_DIR")"
         echo "firmware-dir=$FIRMWARE_DIR" >> "$GITHUB_OUTPUT"
         echo "smart-keymap-dir=$SMART_KEYMAP_DIR" >> "$GITHUB_OUTPUT"
 
@@ -227,24 +230,12 @@ runs:
           --target "${{ inputs.rust-target }}" \
           --no-default-features
         make include/smart_keymap.h
+        # FIRMWARE_DIR is now absolute, so use directly
         mkdir -p "$FIRMWARE_DIR/libsmartkeymap"
-        # When firmware dir is absolute or relative to workspace, cp needs handling;
-        # we are in SMART_KEYMAP_DIR, so resolve FIRMWARE_DIR relative to there if needed.
-        # FIRMWARE_DIR was already absolute or smart-keymap-prefixed, so handle both.
-        if [[ "$FIRMWARE_DIR" = /* ]]; then
-          FW_ABS="$FIRMWARE_DIR"
-        else
-          FW_ABS="$(realpath -m "$FIRMWARE_DIR")"
-          # If that doesn't exist (relative to SMART_KEYMAP_DIR), try relative to SMART_KEYMAP_DIR
-          if [[ ! -d "$FW_ABS" ]]; then
-            FW_ABS="$(realpath -m "$SMART_KEYMAP_DIR/$FIRMWARE_DIR")"
-          fi
-        fi
-        # Also handle include/ being relative to SMART_KEYMAP_DIR
-        cp include/smart_keymap.h "$FW_ABS/libsmartkeymap/"
-        cp "target/${{ inputs.rust-target }}/release/libsmart_keymap.a" "$FW_ABS/libsmartkeymap/"
+        cp include/smart_keymap.h "$FIRMWARE_DIR/libsmartkeymap/"
+        cp "target/${{ inputs.rust-target }}/release/libsmart_keymap.a" "$FIRMWARE_DIR/libsmartkeymap/"
         popd >/dev/null
-        echo "Installed smart_keymap.h and libsmart_keymap.a to $FW_ABS/libsmartkeymap/"
+        echo "Installed smart_keymap.h and libsmart_keymap.a to $FIRMWARE_DIR/libsmartkeymap/"
 
     - name: Build firmware
       id: build-firmware
