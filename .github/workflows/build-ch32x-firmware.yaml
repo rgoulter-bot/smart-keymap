@@ -109,16 +109,23 @@ jobs:
           # caller's checkout. We checkout to `caller/` to keep smart-keymap
           # checkout separate.
 
+      - name: Determine smart-keymap ref
+        id: sm-ref
+        shell: bash
+        run: |
+          WF_REF="${{ github.workflow_ref }}"
+          REF="${WF_REF##*@}"
+          if [[ "$REF" == "$WF_REF" ]] || [[ -z "$REF" ]]; then
+            REF="${{ github.ref }}"
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "Determined smart-keymap ref: $REF (workflow_ref=$WF_REF, github.ref=${{ github.ref }})"
+
       - name: Checkout smart-keymap
         uses: actions/checkout@v4
         with:
-          # When this workflow runs inside smart-keymap (dispatch), this is
-          # a second checkout of the same repo — use explicit repository so
-          # it always fetches smart-keymap even when caller is external.
           repository: rgoulter/smart-keymap
-          # Pin to the ref that contains this workflow when called externally.
-          # `github.workflow_ref` is like `rgoulter/smart-keymap/.github/...@ref`
-          ref: ${{ github.workflow_ref }}
+          ref: ${{ steps.sm-ref.outputs.ref }}
           path: smart-keymap
 
       - name: Resolve caller paths
