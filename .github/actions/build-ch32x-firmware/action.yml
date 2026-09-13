@@ -259,17 +259,29 @@ runs:
 
         export PATH="/opt/xpack-riscv-none-elf-gcc-${GCC_VERSION}/bin:$PATH"
 
-        # Toolchain is relative to smart-keymap root
+        echo "DEBUG: pwd=$(pwd) SMART_KEYMAP_DIR=$SMART_KEYMAP_DIR FIRMWARE_DIR=$FIRMWARE_DIR"
+        ls -la "$SMART_KEYMAP_DIR" 2>&1 | head -n 30 || true
+        ls -la "$SMART_KEYMAP_DIR/firmware/toolchains" 2>&1 | head -n 20 || echo "no $SMART_KEYMAP_DIR/firmware/toolchains"
+        ls -la firmware/toolchains 2>&1 | head -n 20 || echo "no firmware/toolchains"
+
+        # Toolchain is relative to smart-keymap root - resolve robustly
         TOOLCHAIN=""
-        if [[ -f "$SMART_KEYMAP_DIR/firmware/toolchains/riscv-none-elf.cmake" ]]; then
-          TOOLCHAIN="$SMART_KEYMAP_DIR/firmware/toolchains/riscv-none-elf.cmake"
-        elif [[ -f "firmware/toolchains/riscv-none-elf.cmake" ]]; then
-          TOOLCHAIN="firmware/toolchains/riscv-none-elf.cmake"
-        elif [[ -f "toolchains/riscv-none-elf.cmake" ]]; then
-          TOOLCHAIN="toolchains/riscv-none-elf.cmake"
-        else
+        for cand in "$SMART_KEYMAP_DIR/firmware/toolchains/riscv-none-elf.cmake" "firmware/toolchains/riscv-none-elf.cmake" "toolchains/riscv-none-elf.cmake" "$(realpath -m "$SMART_KEYMAP_DIR/firmware/toolchains/riscv-none-elf.cmake" 2>/dev/null || true)" "$(realpath -m "firmware/toolchains/riscv-none-elf.cmake" 2>/dev/null || true)"; do
+          if [[ -f "$cand" ]]; then TOOLCHAIN="$cand"; break; fi
+        done
+        if [[ -z "$TOOLCHAIN" ]]; then
+          # Last resort: find any riscv-none-elf.cmake under smart-keymap dir
+          FOUND="$(find "${SMART_KEYMAP_DIR:-.}" -name "riscv-none-elf.cmake" -type f 2>/dev/null | head -n1 || true)"
+          if [[ -n "$FOUND" ]]; then TOOLCHAIN="$FOUND"; fi
+        fi
+        if [[ -z "$TOOLCHAIN" ]]; then
           echo "::error::toolchain not found (looked for $SMART_KEYMAP_DIR/firmware/toolchains/riscv-none-elf.cmake, firmware/toolchains/riscv-none-elf.cmake, toolchains/riscv-none-elf.cmake)"
+          find . -name "*.cmake" 2>/dev/null | head -n 20 || true
           exit 1
+        fi
+        # Ensure absolute for cmake
+        if [[ "$TOOLCHAIN" != /* ]]; then
+          TOOLCHAIN="$(realpath "$TOOLCHAIN" 2>/dev/null || echo "$TOOLCHAIN")"
         fi
 
         echo "Configuring cmake: firmware=$FIRMWARE_DIR board=$BOARD_ABS toolchain=$TOOLCHAIN build=$BUILD_DIR_ABS"
