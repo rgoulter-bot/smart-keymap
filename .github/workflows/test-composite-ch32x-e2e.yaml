@@ -1,0 +1,60 @@
+name: Test Composite CH32X E2E
+
+# E2E test for the composite action `build-ch32x-firmware`.
+# Runs on feature branch only; exercises documented inputs/outputs with real
+# keyboard.ncl (board) and keymap.ncl on a real runner.
+
+on:
+  push:
+    branches: [feat/gh-action-ch32x-build]
+    paths:
+      - '.github/actions/build-ch32x-firmware/**'
+      - '.github/workflows/test-composite-ch32x-e2e.yaml'
+  workflow_dispatch:
+
+jobs:
+  test-builtin-board:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build with built-in board ch32x-48
+        id: build
+        uses: ./.github/actions/build-ch32x-firmware
+        with:
+          keymap: tests/ncl/keymap-4key-simple/keymap.ncl
+          board: ch32x-48
+          artifact-name: e2e-composite-builtin-ch32x-48
+      - name: Verify outputs
+        run: |
+          echo "elf=${{ steps.build.outputs.firmware-elf }}"
+          echo "hex=${{ steps.build.outputs.firmware-hex }}"
+          echo "bin=${{ steps.build.outputs.firmware-bin }}"
+          test -f "${{ steps.build.outputs.firmware-elf }}"
+          test -f "${{ steps.build.outputs.firmware-hex }}"
+          test -f "${{ steps.build.outputs.firmware-bin }}"
+          ls -lh "${{ steps.build.outputs.firmware-elf }}" "${{ steps.build.outputs.firmware-hex }}" "${{ steps.build.outputs.firmware-bin }}"
+          # Check hex is Intel hex and non-empty
+          head -n1 "${{ steps.build.outputs.firmware-hex }}" | grep -q "^:"
+          test $(stat -c%s "${{ steps.build.outputs.firmware-hex }}") -gt 1000
+          test $(stat -c%s "${{ steps.build.outputs.firmware-bin }}") -gt 1000
+          echo "Built-in board test passed"
+
+  test-custom-board:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create custom keyboard.ncl from ch32x-48
+        run: cp firmware/ch32x035-usb-device-compositekm-c/ncl/boards/ch32x-48.ncl keyboard.ncl && ls -l keyboard.ncl
+      - name: Build with custom board path (keyboard.ncl)
+        id: build
+        uses: ./.github/actions/build-ch32x-firmware
+        with:
+          keymap: tests/ncl/keymap-4key-simple/keymap.ncl
+          board: keyboard.ncl
+          artifact-name: e2e-composite-custom-board
+      - name: Verify outputs
+        run: |
+          test -f "${{ steps.build.outputs.firmware-hex }}"
+          test -f "${{ steps.build.outputs.firmware-bin }}"
+          ls -lh "${{ steps.build.outputs.firmware-hex }}" "${{ steps.build.outputs.firmware-bin }}"
+          echo "Custom board test passed"

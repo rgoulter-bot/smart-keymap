@@ -1,0 +1,21 @@
+name: Test Reusable Caller E2E
+
+# E2E test for the reusable workflow `build-ch32x-firmware.yaml`
+# via workflow_call. This caller workflow lives on the feature branch and
+# invokes the reusable workflow at the same ref.
+
+on:
+  push:
+    branches: [feat/gh-action-ch32x-build]
+    paths:
+      - '.github/workflows/build-ch32x-firmware.yaml'
+      - '.github/workflows/test-reusable-caller-e2e.yaml'
+  workflow_dispatch:
+
+jobs:
+  call-reusable-builtin:
+    uses: ./.github/workflows/build-ch32x-firmware.yaml
+    with:
+      keymap: tests/ncl/keymap-4key-simple/keymap.ncl
+      board: ch32x-48
+      artifact-name: e2e-reusable-builtin
